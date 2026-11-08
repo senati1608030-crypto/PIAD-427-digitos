@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reconocimiento de dígitos</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; margin-top: 30px; }
+  canvas { border: 3px solid #333; background: black; cursor: crosshair; touch-action: none; }
+  button { font-size: 18px; padding: 10px 24px; margin: 10px 6px; cursor: pointer; }
+  #resultado { width: 280px; margin: 15px auto; padding: 15px; border: 2px solid #333; border-radius: 8px; font-size: 18px; }
+</style>
+</head>
+<body>
+  <h2>Reconocimiento de dígitos manuscritos</h2>
+  <p>Dibuja un número del 0 al 9 con el mouse</p>
+  <canvas id="lienzo" width="280" height="280"></canvas><br>
+  <button id="btnPredecir">Predecir</button>
+  <button id="btnBorrar">Borrar</button>
+  <div id="resultado">Aquí aparecerá el resultado</div>
+
+<script>
+const lienzo = document.getElementById("lienzo"); // Recuadro de dibujo
+const ctx = lienzo.getContext("2d"); // Herramienta para dibujar
+let dibujando = false; // Indica si el mouse está presionado
+
+function limpiar() { // Deja el recuadro en negro
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, 280, 280);
+}
+limpiar(); // Se limpia al abrir la página
+
+ctx.strokeStyle = "white"; // El trazo es blanco, como en MNIST
+ctx.lineWidth = 18; // Grosor del trazo
+ctx.lineCap = "round"; // Trazo redondeado
+
+function posicion(e) { // Calcula dónde está el mouse dentro del recuadro
+  const r = lienzo.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+lienzo.addEventListener("pointerdown", function(e) { // Al presionar: empieza a dibujar
+  dibujando = true;
+  const p = posicion(e);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+});
+lienzo.addEventListener("pointermove", function(e) { // Al mover con el botón presionado: dibuja
+  if (!dibujando) return;
+  const p = posicion(e);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+});
+window.addEventListener("pointerup", function() { dibujando = false; }); // Al soltar: deja de dibujar
+
+document.getElementById("btnBorrar").addEventListener("click", function() { // Botón Borrar
+  limpiar();
+  document.getElementById("resultado").innerText = "Aquí aparecerá el resultado";
+});
+
+document.getElementById("btnPredecir").addEventListener("click", async function() { // Botón Predecir
+  const caja = document.getElementById("resultado");
+  caja.innerText = "Analizando...";
+  const resp = await fetch("/predecir", { // Envía el dibujo al servidor
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imagen: lienzo.toDataURL("image/png") })
+  });
+  const datos = await resp.json(); // Respuesta del servidor
+  if (datos.error) { caja.innerText = datos.error; return; }
+  caja.innerHTML = "Predicción: <b>" + datos.digito + "</b><br>Certeza: " + datos.certeza + " %<br>Accuracy del modelo: " + datos.accuracy + " %";
+});
+</script>
+</body>
+</html>
